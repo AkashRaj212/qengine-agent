@@ -1,0 +1,37 @@
+// =====================================================================
+// QEngine pro-code test case (template)
+// Generated from a completed Playwright run. Syntax reference:
+//   reference/qengine-script-syntax.md
+//
+// Inline locators are BARE selectors (no xpath=/css= prefix):
+//   id    -> "#elementId"
+//   class -> ".className"
+//   xpath -> "//tag[...]"
+// Prefer ui.<page>.<element> repository refs captured by the QEngine recorder.
+// =====================================================================
+
+// Open the page under test
+openURL("https://app.example.com/path", "same window");
+wait(3);
+
+// ---- Example: create an entity ----
+click(".vi-bookings-add-btn");                  // + button (by class)
+click("//button[@class='vi-add-menu-item'][2]"); // menu item (by xpath + index)
+wait(2);                                          // no waitForElement; let dialog open
+
+setValue("#qaSvcName", "Test Service 1");         // by id
+setValue("#qaSvcDesc", "Dummy description 1");
+setValue("#qaSvcDuration", "30");
+
+click(".vi-qa-submit");                           // Add button (by class)
+wait(2);                                          // let the new card render
+
+// Verify it was created (exact text, no normalize-space)
+assertText("//div[text()='Test Service 1']", "Test Service 1", errorhandling.STOP_ON_ERROR);
+
+// ---- Data-driven variant using @parameters ----
+// setValue("#qaSvcName", @service_name);
+// setValue("#qaSvcDuration", @duration + "");
+// click(".vi-qa-submit");
+// wait(2);
+// assertText("//div[text()='" + @service_name + "']", @service_name, errorhandling.STOP_ON_ERROR);
