@@ -5,7 +5,9 @@ description: >-
   the completed flow into Zoho QEngine pro-code format and save it as a .txt
   file ready to paste into QEngine. Use when the user provides web test cases
   (markdown/text/Gherkin) to automate, asks to run web UI tests for QEngine, or
-  wants QEngine-formatted test code generated from a completed run.
+  wants QEngine-formatted test code generated from a completed run. When the
+  user says Learn, record how that action is reached in the product and reuse
+  the shared access path on later similar cases.
 disable-model-invocation: true
 ---
 
@@ -25,6 +27,8 @@ Scoped to **web UI testing** (mobile and API out of scope for now).
 4. **Summarize** results (pass / fail / skip + failure reasons).
 5. **Convert** the completed flow to QEngine pro-code and save as a `.txt` file.
 6. **Handle errors** explicitly at every stage and fail loudly with guidance.
+7. **Learn** (only when the user says Learn) how an action is reached in the
+   product, save that path, and reuse the shared steps on a later similar case.
 
 ## Workflow
 
@@ -37,6 +41,7 @@ Copy this checklist and track progress:
 - [ ] Step 3: Normalize the provided test cases
 - [ ] Step 4: Generate / update spec files (apply auth + cookies)
 - [ ] Step 5: Run tests via Cursor IDE browser tab (preferred) or Playwright terminal
+- [ ] Step 5L: If Learn was requested, save a reusable access recipe (and reuse any existing recipe first)
 - [ ] Step 6: Summarize results (pass/fail/skip + failure reasons)
 - [ ] Step 7: Convert to QEngine pro-code and save as <name>_qengine.txt
 - [ ] Step 8: Report back with artifacts and next actions
@@ -239,6 +244,14 @@ Array.from(document.querySelectorAll('input,button,select,[id]'))
 ```
 Record: `id` (if stable / non-random), `class`, `href`, `name`, `placeholder`, and any `data-*` attributes. Log these in a running selector table as you go. Use these captured selectors directly in the QEngine output — never guess or defer.
 
+**Learn and reuse (when a recipe already exists, or Learn was requested):**
+
+Before the first click of a case, run `scripts/learn_recipe.js match` (see the
+Learn command). Use its JSON. Do not rediscover a path the script says to
+reuse. If the user said Learn, after the case passes, run
+`scripts/learn_recipe.js save` (Step 5L). That writes the recipe and a
+JavaScript module the next case can call.
+
 Only fall back to running `bash scripts/run_tests.sh` when the user
 **explicitly asks** for a Playwright terminal run.
 
@@ -375,6 +388,8 @@ starting shape.
 - Totals: passed / failed / skipped, duration.
 - Each failure: test id, expected vs actual, trace path.
 - Path to the generated `<name>_qengine.txt` file.
+- Learn: recipe written or reused, and which steps were shared vs specific
+  to this entity. Omit this line when Learn did not run and nothing was reused.
 
 ## Error handling rules
 
@@ -392,8 +407,148 @@ starting shape.
 | Run | Flaky/timeout | Retries + tracing; report flakiness |
 | Report | Missing `results.json` | Surface runner stderr; never fabricate |
 | QEngine | `text()`, `contains()`, `normalize-space()` in XPath silently fail | Use attribute XPath only (`[@attr='val']`); assert text via `#id`/`.class` locators |
+| Learn | User said Learn but the case failed | Do not save a recipe. Report the failure |
+| Learn | No exact recipe, same pattern exists | Reuse the shared steps only. Discover the new entity's menu item and fields in the browser |
+| Learn | No recipe and no same-pattern recipe | Explore that case in the browser. Do not invent a path from another product |
 
 Full troubleshooting: [reference/playwright-patterns.md](reference/playwright-patterns.md).
+
+## Custom command: `Learn`
+
+Use this only when the user asks to learn. Trigger phrases: `Learn`, `/learn`,
+`learn how to …`, or a test request that starts with `Learn` (for example
+`Learn: add Cx`).
+
+Learn means: while you test, record **how the product is accessed** for that
+action, split the steps into a shared path and an entity-specific part, and
+save it so a later similar action can start from the shared path.
+
+Example the command is built for:
+
+- The user says `Learn` and gives an **add Cx** case. You open the product,
+  find how Cx is added (which page, which Add control, which menu item, which
+  fields, which submit), and save that as a recipe.
+- Later the user wants to **add an appointment**. You do not explore the Add
+  menu from scratch. You reuse the add-Cx access path (open the module, click
+  Add, wait for the menu or dialog, submit) and only learn what is different
+  for appointment (its menu item and its fields).
+
+### When to run it
+
+- **Learn was said:** run the case in the browser, then write the recipe from
+  the path that actually worked.
+- **Learn was not said, but a recipe for this product already exists:** still
+  reuse it (read path below). Do not write a new recipe unless the user said
+  Learn, or a reused step was wrong and you had to correct it — then update
+  the recipe you corrected.
+- **Learn was not said and no recipe exists:** test as usual. Do not create a
+  recipe.
+
+### Before you click anything
+
+From this skill folder, run:
+
+```bash
+node scripts/learn_recipe.js match \
+  --product "https://bookings.zoho.com" \
+  --action "add appointment" \
+  --pattern create-from-add-menu
+```
+
+`--pattern` is optional. Omit it on the first lookup. The script reads
+`learned/<product-slug>/` next to this `SKILL.md`.
+
+Use the JSON it prints:
+
+- `match: "exact"` → run the whole recipe, including specific steps. Call
+  `runSharedPath` from the printed `jsFile`.
+- `match: "pattern"` → call `runSharedPath` from `source.jsFile` for the
+  shared path. In the browser, discover only the new entity (its menu item
+  and fields) and pass those as the `menuItem` and `fields` hooks.
+- `match: "ambiguous"` → do not guess. Ask which pattern applies, or explore.
+- Exit code `2` (`match: "none"`) → no reusable path. Explore in the browser.
+
+### What to record while testing
+
+On every confirmed interaction (the same moment you capture selectors), tag
+the step:
+
+| Tag | Meaning | Add Cx example | Reused for add appointment? |
+|-----|---------|----------------|-----------------------------|
+| `shared` | Same control and same screen for every entity of this pattern | Click Add (`.vi-bookings-add-btn`), wait until the add menu is open, click submit (`.vi-qa-submit`) | Yes — copy these lines |
+| `specific` | Only this entity | Menu item for Cx, Cx field ids, Cx success text | No — discover the appointment menu item and fields |
+
+Also record, in plain sentences the next run can follow:
+
+- **Reach:** page URL, then the clicks that open the action. Name the module.
+- **Pattern:** a short family name such as `create-from-add-menu`,
+  `create-from-toolbar`, `edit-row`, `delete-row`. Two actions share a pattern
+  when the shell is the same and only the entity (menu item, fields, label)
+  changes.
+- **Selectors:** the real `id` / `class` / attribute XPath captured from the
+  live DOM. Same locator rules as QEngine output.
+- **Fields:** label, locator, input type, required or not.
+- **Done when:** the check that proved the action worked.
+
+Do not record login. Do not record a path you guessed and did not execute.
+Do not save secrets, tokens, or real customer data — use the test values
+already in the case.
+
+### Reuse rules
+
+When a shared path matches:
+
+1. Start from `source.jsShared`. `runSharedPath(page, specific)` is the shared
+   path. For add appointment after add Cx, pass only appointment's menu item
+   and fields:
+
+   ```javascript
+   const { runSharedPath } = require("./add-cx.js");
+   await runSharedPath(page, {
+     menuItem: async (page) => { /* appointment menu item, captured from the page */ },
+     fields: async (page) => { /* appointment fields, captured from the page */ },
+   });
+   ```
+
+   Do not re-snapshot the whole app looking for another way in. Confirm the
+   shared control (the Add button in that example) is still on the page, then
+   discover only the delta.
+2. In the QEngine file, paste `source.qengineShared` and fill the specific
+   hooks. Keep the `source.comment` line on the reused block.
+3. If a shared step no longer matches the page, stop reusing that step, find
+   the new control, and say so in the report. If Learn is active, save again.
+   If Learn is not active, save again only for the step that broke, and note
+   the correction in the report.
+
+### Where to save
+
+Do not hand-write recipe files. After a **passing** Learn run, save with the
+script. It writes the markdown recipe, the JavaScript module, and `INDEX.md`.
+
+```bash
+node scripts/learn_recipe.js save --file recipe.json
+```
+
+`recipe.json` fields: `passed` (must be `true`), `product`, `verb`, `entity`,
+`pattern`, `page`, `reach`, `sharedSteps`, `specificSteps`, `qengineShared`.
+Put a `// ... specific ...` comment in `qengineShared` everywhere the next
+entity must plug in (menu item, fields). The script turns those comments into
+`menuItem` and `fields` hooks in `learned/<product>/<action>.js`.
+
+The script refuses a save when `passed` is not `true`, and refuses secret
+fields. Saving the same action again refreshes the files and keeps the old
+shared path under `previous` when that path changed.
+
+File shape: [reference/learn-recipes.md](reference/learn-recipes.md).
+
+### Report
+
+In the Step 8 summary add:
+
+- Whether Learn ran
+- Recipe path written or updated
+- Which later steps were reused, and from which recipe
+- The delta that was new (for example: appointment menu item and fields)
 
 ## Custom command: `/load-product-doc <url-or-path>`
 
