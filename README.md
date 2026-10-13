@@ -25,6 +25,8 @@ retries/tracing, and explicit error handling.
 4. **Summarize** outcomes (with `[TC-xxx]` ids preserved for traceability).
 5. **Convert** the completed (pass-only) flow into QEngine pro-code and save as
    `reports/<name>_qengine.txt`.
+6. **Learn** (when you say Learn) how an action is reached — for example how
+   to add Cx — and reuse that shared path later (for example add appointment).
 
 ## Layout
 
@@ -35,11 +37,14 @@ qengine-agent/
 │   ├── qengine.md                    # verified QEngine integration details
 │   ├── qengine-script-syntax.md      # QEngine pro-code command syntax + mapping
 │   ├── playwright-patterns.md        # robust patterns + troubleshooting matrix
-│   └── test-case-format.md           # accepted input formats + mapping rules
+│   ├── test-case-format.md           # accepted input formats + mapping rules
+│   └── learn-recipes.md              # Learn command: recipe shape and reuse rules
+├── learned/                          # saved access paths, one folder per product
 ├── scripts/
 │   ├── ensure_playwright_mcp.py      # install/configure Playwright MCP if missing
 │   ├── run_tests.sh                  # run Playwright (TS/Python) → reports
 │   ├── parse_results.py              # results.json/junit.xml → summary.json
+│   ├── learn_recipe.js               # Learn: save a path and reuse it as JS
 │   └── push_to_qengine.py            # optional push helper (not part of default flow)
 ├── templates/
 │   ├── example.spec.ts               # id-preserving spec template

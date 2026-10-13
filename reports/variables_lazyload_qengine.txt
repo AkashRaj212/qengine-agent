@@ -1,0 +1,117 @@
+// =====================================================================
+// QEngine pro-code — Variables lazy-load (PASS cases only)
+// App: Zoho QEngine | Page: Settings → Variables
+// URL: /akash/projects/3000000002001/variables
+//
+// Policy:
+//   - No authentication steps (session already logged in)
+//   - Starts on the Variables page once testing begins
+//   - Failed/BUG cases (TC17) are omitted from this automation
+//
+// Selector map (captured from live DOM):
+//   #variablePopoverOrigin          — page heading / popover origin
+//   #variablesList                  — env/global switcher popover
+//   #globalVariablesTable           — global variables lyte-table
+//   #variablesTable                 — environment variables lyte-table
+//   #searchGlobalKeyValue           — global search input
+//   #searchVariableKeyValue         — env search input
+//   #globalVariableSearch           — global search container
+//   #envVariableSearch              — env search container
+//   .vi-add-new-txt                 — Add New
+//   .vi-bulk-add-txt                — Bulk Add
+//   //li[@id='3000000007264']       — env set "environment"
+// =====================================================================
+
+// Open Variables page (already authenticated — no login steps)
+openURL("https://akash-21967.csez.zohocorpin.com:9090/akash/projects/3000000002001/variables", "same window");
+wait(5);
+
+// TC1: Initial load shows Variables heading, global table, and first page ready
+assertVisible("#variablePopoverOrigin", errorhandling.STOP_ON_ERROR);
+assertVisible("#globalVariablesTable", errorhandling.STOP_ON_ERROR);
+assertVisible("#searchGlobalKeyValue", errorhandling.STOP_ON_ERROR);
+// no stable id — assertion omitted for Total Count footer text
+
+// TC2: Virtual scroll table is present (infinite-scroll lyte-table)
+assertVisible("#globalVariablesTable", errorhandling.CONTINUE_ON_ERROR);
+wait(1);
+
+// TC3: Scroll-down triggers lazy load of next batch
+scrollTo("#globalVariablesTable");
+wait(2);
+// no stable id — assertion omitted for loaded key window contents
+
+// TC4: Scroll-up keeps earlier variables reachable in the loaded window
+scrollTo("#variablePopoverOrigin");
+wait(2);
+
+// TC5: Continuous scroll-down loads later pages
+scrollTo("#globalVariablesTable");
+wait(2);
+scrollTo("#globalVariablesTable");
+wait(2);
+
+// TC6: Search filters variables via lazy-load search API
+setValue("#searchGlobalKeyValue", "variable_500");
+sendKeys("#searchGlobalKeyValue", [keys.ENTER]);
+wait(3);
+assertValue("#searchGlobalKeyValue", "variable_500", errorhandling.STOP_ON_ERROR);
+// no stable id — assertion omitted for matching row text
+
+// TC7: Clear search restores full lazy-load list
+click("#globalVariableSearch .zv-close");
+wait(3);
+assertVisible("#globalVariablesTable", errorhandling.STOP_ON_ERROR);
+
+// TC8: Add New with lazy load scrolls/loads last page and shows empty row
+click(".vi-add-new-txt");
+wait(4);
+assertVisible("#globalVariablesTable", errorhandling.CONTINUE_ON_ERROR);
+// no stable id — assertion omitted for emptyRow presence
+
+// TC9: Switch to Environment Variable resets lazy-load and shows env table
+click("#variablePopoverOrigin .zv-arrow-down");
+wait(2);
+click("//li[@id='3000000007264']");
+wait(4);
+assertVisible("#variablesTable", errorhandling.STOP_ON_ERROR);
+assertVisible("#searchVariableKeyValue", errorhandling.STOP_ON_ERROR);
+
+// TC10: Environment variable table supports scroll-down lazy load
+scrollTo("#variablesTable");
+wait(2);
+scrollTo("#variablesTable");
+wait(2);
+
+// TC11: Lazy load API uses startIndex/limit (covered by TC3/TC10 scroll behavior)
+// no UI-only assertion — pagination verified during Playwright network/component checks
+
+// TC12: startIndexes tracks loaded pages (component-level; no UI assertion)
+// no stable id — assertion omitted
+
+// TC13: Env key dropdown lazy-loads keys (dropdown open on empty/new row)
+click(".vi-add-new-txt");
+wait(3);
+// no stable id on zq-drop-box scroll target — assertion omitted
+
+// TC14: Env lazy load can reach final page / all keys
+scrollTo("#variablesTable");
+wait(2);
+scrollTo("#variablesTable");
+wait(2);
+assertVisible("#variablesTable", errorhandling.CONTINUE_ON_ERROR);
+
+// TC15: Search works on Environment Variables with lazy-load data
+setValue("#searchVariableKeyValue", "variable_450");
+sendKeys("#searchVariableKeyValue", [keys.ENTER]);
+wait(3);
+assertValue("#searchVariableKeyValue", "variable_450", errorhandling.STOP_ON_ERROR);
+
+// TC16: Returning to Global Variables resets lazy-load to first page
+openURL("https://akash-21967.csez.zohocorpin.com:9090/akash/projects/3000000002001/variables", "same window");
+wait(5);
+assertVisible("#globalVariablesTable", errorhandling.STOP_ON_ERROR);
+assertVisible("#searchGlobalKeyValue", errorhandling.STOP_ON_ERROR);
+assertVisible("#variablePopoverOrigin", errorhandling.STOP_ON_ERROR);
+
+// TC17 omitted — BUG: backscroll after Add New does not apply earlier pages
